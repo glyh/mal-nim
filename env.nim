@@ -18,14 +18,15 @@ proc find*(env: MalEnvironment, symbol: string) : MalType =
     logger.log(lvlError, fmt"The symbol ""{symbol}"" doesn't exist in this context")
     MalNilAtom
 
+
 const builtinFunctions* : Table[string, (varargs[MalType]) -> MalType] = {
-  "+": proc (params: varargs[MalType]) : MalType {.closure.} =
+  "+": proc (args: varargs[MalType]) : MalType {.closure.} =
     try:
       var
         ansInt: int64 = 0
         ansDouble: float64 = 0
         isDouble = false
-      for i in params:
+      for i in args:
         assert(i of MalAtom)
         let ia = MalAtom(i)
         assert(ia.atomType in {MalInteger, MalDouble})
@@ -42,14 +43,14 @@ const builtinFunctions* : Table[string, (varargs[MalType]) -> MalType] = {
     except AssertionDefect:
       logger.log(lvlError, "Type error in function `+`")
       return MalNilAtom,
-  "-": proc (params: varargs[MalType]) : MalType {.closure.} =
+  "-": proc (args: varargs[MalType]) : MalType {.closure.} =
     try:
-      case params.len:
+      case args.len:
         of 0:
           logger.log(lvlError, "Wrong number of parameters in function `-`")
           return MalNilAtom
         of 1:
-          let x = params[0]
+          let x = args[0]
           assert (x of MalAtom)
           let xa = MalAtom(x)
           assert (xa.atomType in {MalInteger, MalDouble})
@@ -63,7 +64,7 @@ const builtinFunctions* : Table[string, (varargs[MalType]) -> MalType] = {
               ansDouble: float64 = 0
               isDouble = false
               sign = 1
-            for i in params:
+            for i in args:
               assert(i of MalAtom)
               let ia = MalAtom(i)
               assert(ia.atomType in {MalInteger, MalDouble})
@@ -81,13 +82,13 @@ const builtinFunctions* : Table[string, (varargs[MalType]) -> MalType] = {
     except AssertionDefect:
       logger.log(lvlError, "Type error in function `-`")
       return MalAtom(atomType: MalInteger, intValue: 0),
-  "*": proc (params: varargs[MalType]): MalType {.closure.} =
+  "*": proc (args: varargs[MalType]): MalType {.closure.} =
     try:
       var
         ansInt: int64 = 1
         ansDouble: float64 = 1
         isDouble = false
-      for i in params:
+      for i in args:
         assert(i of MalAtom)
         let ia = MalAtom(i)
         assert(ia.atomType in {MalInteger, MalDouble})
@@ -104,14 +105,14 @@ const builtinFunctions* : Table[string, (varargs[MalType]) -> MalType] = {
     except AssertionDefect:
       logger.log(lvlError, "Type error in function `*`")
       return MalAtom(atomType: MalInteger, intValue: 0),
-  "/": proc (params: varargs[MalType]): MalType {.closure.} =
+  "/": proc (args: varargs[MalType]): MalType {.closure.} =
     try:
-      case params.len:
+      case args.len:
         of 0:
           logger.log(lvlError, "Wrong number of parameters in function `-`")
           return MalAtom(atomType: MalInteger, intValue: 0)
         of 1:
-          let x = params[0]
+          let x = args[0]
           assert (x of MalAtom)
           let xa = MalAtom(x)
           assert (xa.atomType in {MalInteger, MalDouble})
@@ -127,7 +128,7 @@ const builtinFunctions* : Table[string, (varargs[MalType]) -> MalType] = {
               ansDouble: float64 = 1
               isDouble = false
               mul = true
-            for i in params:
+            for i in args:
               assert(i of MalAtom)
               let ia = MalAtom(i)
               assert(ia.atomType in {MalInteger, MalDouble})
@@ -156,7 +157,7 @@ const builtinFunctions* : Table[string, (varargs[MalType]) -> MalType] = {
     except DivByZeroDefect:
       logger.log(lvlError, "Divded by zero in function `/`!")
       return MalAtom(atomType: MalInteger, intValue: 0),
-  "quit": proc (params: varargs[MalType]) : MalType {.closure.} =
+  "quit": proc (args: varargs[MalType]) : MalType {.closure.} =
     echo "Goodbye!"
     quit()
 }.toTable()
