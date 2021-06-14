@@ -1,4 +1,4 @@
-import tables, hashes
+import tables, hashes, sugar
 type
   MalAtomType* = enum
     MalInteger
@@ -8,6 +8,8 @@ type
     MalBool
     MalString
     MalKeyword
+    MalLambda
+    MalMacro
   MalType* = ref object of RootObj
   MalList* = ref object of MalType
     items*: seq[MalType]
@@ -29,9 +31,18 @@ type
         boolValue*: bool
       of MalKeyword:
         key*: string
+      of MalLambda:
+        f*: (varargs[MalType]) -> MalType
+      of MalMacro:
+        g*: (var MalEnvironment, varargs[MalType]) -> MalType
       of MalNil:
         discard
+  MalEnvironment* = ref object
+    outer*: MalEnvironment
+    symbols*: Table[string, MalType]
   MalNothingToRead* = object of CatchableError
+let MalNilAtom* = MalAtom(atomType: MalNil)
+
 func hash*(x: MalType) : Hash =
   var h: Hash = 0
   if x of MalList:
@@ -64,4 +75,8 @@ func hash*(x: MalType) : Hash =
         h = h !& hash("keyword") !& hash(a.key)
       of MalNil:
         h = h !& hash("nil")
+      of MalLambda:
+        raise newException(FieldDefect, "Trying to hash lambdas!")
+      of MalMacro:
+        raise newException(FieldDefect, "Trying to hash macros!")
   result = !$h

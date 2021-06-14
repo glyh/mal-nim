@@ -43,5 +43,9 @@ proc `$`*(m : MalType) : string =
         result = escape(a.strValue)
       of MalKeyword:
         result = ":" & a.key
+      of MalLambda:
+        result = "<Lambda>"
+      of MalMacro:
+        result = "<Macro>"
   else:
     logger.log(lvlError, "Unknown syntax tree")
