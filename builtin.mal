@@ -1,0 +1,15 @@
+(def! not (fn* (b)
+  (if b false true)))
+(def! fib (fn* (n) (if (< n 3) 1 (+ (fib (- n 1)) (fib (- n 2))))))
+
+(def! sum (fn* [n]
+  (if (= n 1) 1 (+ n (sum (- n 1))))))
+
+; <=, >= to be implemented
+; (def! <= (fn* [& args]
+;   (if (= (count args) 1)
+;     true
+;
+;
+;
+;   )))

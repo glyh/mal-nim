@@ -1,4 +1,4 @@
-import re, logging, parseutils, strutils, system, tables
+import re, logging, parseutils, strutils, system, tables, strformat
 import definition
 var logger = newConsoleLogger()
 
@@ -27,9 +27,13 @@ proc readList(r: var Reader) : MalList =
     else:
       try:
         result.items.add(r.readForm())
-      except MalNothingToRead:
-        break
-  logger.log(lvlError, "Missing right parenthesis!")
+      except MalReadRBracket:
+        let rb = getCurrentExceptionMsg()
+        if rb != ")":
+          raise newException(ValueError, fmt"Expecting "")"", got {rb}")
+        else:
+          break
+  raise newException(ValueError, "Missing right parenthesis!")
 
 proc readVector(r : var Reader) : MalVector =
   r.forward()
@@ -41,9 +45,13 @@ proc readVector(r : var Reader) : MalVector =
     else:
       try:
         result.items.add(r.readForm())
-      except MalNothingToRead:
-        break
-  logger.log(lvlError, "Missing right bracket!")
+      except MalReadRBracket:
+        let rb = getCurrentExceptionMsg()
+        if rb != "]":
+          raise newException(ValueError, fmt"Expecting ""]"", got {rb}")
+        else:
+          break
+  raise newException(ValueError, "Missing right parenthesis!")
 
 proc readHashMap(r : var Reader) : MalHashMap =
   r.forward()
@@ -63,35 +71,38 @@ proc readHashMap(r : var Reader) : MalHashMap =
           logger.log(lvlWarn, "Duplicate key ignored.")
         else:
           result.map[k] = v
-      except MalNothingToRead:
-        break
-  logger.log(lvlError, "Missing right bracket!")
+      except MalReadRBracket:
+        let rb = getCurrentExceptionMsg()
+        if rb != "]":
+          raise newException(ValueError, fmt"Expecting ""}}"", got {rb}")
+        else:
+          break
+  raise newException(ValueError, "Missing right parenthesis!")
 
 proc readAtom(r: var Reader) : MalAtom =
   let cur = r.peak()
-  result =
-    if match(cur, re"^[+-]?[0-9]+$"):
-      var i: int64
-      discard parseBiggestInt(cur, i)
-      MalAtom(atomType: MalInteger, intValue: i)
-    elif match(cur, re"^[+-]?\d*\.[0-9]+(e[+-]?\d+)?$"):
-      var f: float64
-      discard parseFloat(cur, f)
-      MalAtom(atomType: MalDouble, doubleValue: f)
-    elif match(cur, re"^""(\.|[^""\\])*""?$"):
-      if cur[^1] != '"':
-        logger.log(lvlError, "Missing double quote for string!")
-        MalAtom(atomType: MalString, strValue: unescape(cur & "\""))
-      else:
-        MalAtom(atomType: MalString, strValue: unescape(cur))
-    elif match(cur, re("^(true|false)$")):
-      MalAtom(atomType: MalBool, boolValue: cur == "true")
-    elif match(cur, re("^nil$")):
-      MalAtom(atomType: MalNil)
-    elif match(cur, re("^:.*$")):
-      MalAtom(atomType: MalKeyword, key: cur[1..^1])
+  if match(cur, re"^[+-]?[0-9]+$"):
+    var i: int64
+    discard parseBiggestInt(cur, i)
+    result = MalAtom(atomType: MalInteger, intValue: i)
+  elif match(cur, re"^[+-]?\d*\.[0-9]+(e[+-]?\d+)?$"):
+    var f: float64
+    discard parseFloat(cur, f)
+    result = MalAtom(atomType: MalDouble, doubleValue: f)
+  elif match(cur, re"^""(\\.|[^""\\])*""?$"):
+    if cur[^1] != '"':
+      raise newException(ValueError, "Missing double quote for string!")
     else:
-      MalAtom(atomType: MalSymbol, id: cur)
+      var strReal = cur.unescape().replace("\\n", "\n")
+      result = MalAtom(atomType: MalString, strValue: strReal)
+  elif match(cur, re("^(true|false)$")):
+    result =  MalAtom(atomType: MalBool, boolValue: cur == "true")
+  elif match(cur, re("^nil$")):
+    result = MalAtom(atomType: MalNil)
+  elif match(cur, re("^:.*$")):
+    result = MalAtom(atomType: MalKeyword, key: cur[1..^1])
+  else:
+    result = MalAtom(atomType: MalSymbol, id: cur)
   r.forward()
 
 proc readForm(r: var Reader) : MalType =
@@ -102,7 +113,8 @@ proc readForm(r: var Reader) : MalType =
     of "(": r.readList()
     of "[": r.readVector()
     of "{": r.readHashMap()
-    of ")", "]", "}": raise newException(MalNothingToRead, "")
+    of ")", "]", "}":
+      raise newException(MalReadRBracket, r.peak())
     of "'", "`", "~", "~@", "@":
       const specialMap = {"'": "quote",
                    "`": "quasiquote",
@@ -123,10 +135,10 @@ proc readForm(r: var Reader) : MalType =
         @[MalType(MalAtom(atomType: MalSymbol, id: "with-meta")), form, meta])
     else: r.readAtom()
 
-proc createReader(tokens: seq[string]) : Reader =
+proc createReader*(tokens: seq[string]) : Reader =
   Reader(tokens : tokens)
 
-proc tokenize(s: string) : seq[string] =
+proc tokenize*(s: string) : seq[string] =
   result = @[]
   var
     p = 0
@@ -134,14 +146,22 @@ proc tokenize(s: string) : seq[string] =
       re(r"([\s,]*" &
       r"(~@|[\[\]{}()'`~^@]|""(?:\\.|[^\\""])*""?|;.*|[^\s\[\]{}('""`,;)]*))")
     captured : array[0..1, string]
-  while true:
+  while p < s.len:
     let pos = find(s, token, captured, p)
     if pos < 0 or pos >= s.len: break
-    if captured[1].len == 0 or captured[1][0] == ';': break
-    result.add(captured[1])
-    p = pos + captured[0].len
+    if captured[1].len == 0: break
+    if captured[1][0] == ';':
+      p = pos + captured[0].len
+      while s[p] != '\n' and p < s.len:
+        p += 1
+    else:
+      result.add(captured[1])
+      p = pos + captured[0].len
 
-proc readString*(s: string) : MalType =
+proc readString*(s: string) : seq[MalType] =
   var reader: Reader = createReader(tokenize(s))
-  if reader.empty(): raise newException(MalNothingToRead, "")
-  else: return reader.readForm()
+  result = @[]
+  if reader.empty():
+    raise newException(MalNothingToRead, "")
+  while not reader.empty():
+    result.add(reader.readForm())

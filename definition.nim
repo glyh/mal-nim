@@ -9,6 +9,7 @@ type
     MalString
     MalKeyword
     MalLambda
+    MalBuiltInLambda
     MalMacro
   MalType* = ref object of RootObj
   MalList* = ref object of MalType
@@ -17,6 +18,13 @@ type
     items*: seq[MalType]
   MalHashMap* = ref object of MalType
     map*: Table[MalType, MalType]
+  TCOData* = object
+    ast*: MalType
+    params*: seq[string]
+    env*: MalEnvironment
+    #fn*: MalType
+    fn*: (varargs[MalType]) -> MalType
+    VarArgs*: bool
   MalAtom* = ref object of MalType
     case atomType*: MalAtomType
       of MalInteger:
@@ -32,7 +40,9 @@ type
       of MalKeyword:
         key*: string
       of MalLambda:
-        f*: (varargs[MalType]) -> MalType
+        f*: TCOData
+      of MalBuiltInLambda:
+        fPrimitive*: (varargs[MalType]) -> MalType
       of MalMacro:
         g*: (var MalEnvironment, varargs[MalType]) -> MalType
       of MalNil:
@@ -41,6 +51,8 @@ type
     outer*: MalEnvironment
     symbols*: Table[string, MalType]
   MalNothingToRead* = object of CatchableError
+  MalReadRBracket* = object of CatchableError
+  MalSyntaxError* = object of CatchableError
 let MalNilAtom* = MalAtom(atomType: MalNil)
 
 func hash*(x: MalType) : Hash =
@@ -75,8 +87,77 @@ func hash*(x: MalType) : Hash =
         h = h !& hash("keyword") !& hash(a.key)
       of MalNil:
         h = h !& hash("nil")
-      of MalLambda:
+      of MalLambda, MalBuiltInLambda:
         raise newException(FieldDefect, "Trying to hash lambdas!")
       of MalMacro:
         raise newException(FieldDefect, "Trying to hash macros!")
   result = !$h
+
+#[
+  MalAtom* = ref object of MalType
+    case atomType*: MalAtomType
+      of MalInteger:
+        intValue*: int64
+      of MalDouble:
+        doubleValue*: float64
+      of MalSymbol:
+        id*: string
+      of MalString:
+        strValue*: string
+      of MalBool:
+        boolValue*: bool
+      of MalKeyword:
+        key*: string
+      of MalLambda:
+        f*: (varargs[MalType]) -> MalType
+      of MalMacro:
+        g*: (var MalEnvironment, varargs[MalType]) -> MalType
+      of MalNil:
+        discard
+]#
+proc `==`*(lhs: MalType, rhs: MalType) : bool =
+  if (lhs of MalList or lhs of MalVector) and (rhs of MalList or rhs of MalVector):
+    let
+      il =
+        if lhs of MalList:
+          MalList(lhs).items
+        else:
+          MalVector(lhs).items
+      ir =
+        if rhs of MalList:
+          MalList(rhs).items
+        else:
+          MalVector(rhs).items
+    il == ir
+  elif lhs of MalHashMap and rhs of MalHashMap:
+    let
+      ml = MalHashMap(lhs)
+      mr = MalHashMap(rhs)
+    ml.map == mr.map
+  elif lhs of MalAtom and rhs of MalAtom:
+    let
+      al = MalAtom(lhs)
+      ar = MalAtom(rhs)
+    return al.atomType == ar.atomType and (
+        case al.atomType:
+          of MalInteger:
+            al.intValue == ar.intValue
+          of MalDouble:
+            al.doubleValue == ar.doubleValue
+          of MalSymbol:
+            al.id == ar.id
+          of MalNil:
+            true
+          of MalBool:
+            al.boolValue == ar.boolValue
+          of MalString:
+            al.strValue == ar.strValue
+          of MalKeyword:
+            al.key == ar.key
+          of MalLambda, MalBuiltInLambda:
+            raise newException(FieldDefect, "Trying to compare lambdas!")
+          of MalMacro:
+            raise newException(FieldDefect, "Trying to compare macros!")
+      )
+  else:
+    false
