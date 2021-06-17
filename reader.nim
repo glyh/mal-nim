@@ -146,14 +146,18 @@ proc tokenize*(s: string) : seq[string] =
       re(r"([\s,]*" &
       r"(~@|[\[\]{}()'`~^@]|""(?:\\.|[^\\""])*""?|;.*|[^\s\[\]{}('""`,;)]*))")
     captured : array[0..1, string]
+  #echo "ok"
   while p < s.len:
     let pos = find(s, token, captured, p)
+    #echo fmt"{pos}, {p}, {s}, {len(s)}"
     if pos < 0 or pos >= s.len: break
     if captured[1].len == 0: break
     if captured[1][0] == ';':
+      #echo "meet comment"
       p = pos + captured[0].len
-      while s[p] != '\n' and p < s.len:
+      while p < s.len and s[p] != '\n':
         p += 1
+      #echo "echo dumped"
     else:
       result.add(captured[1])
       p = pos + captured[0].len

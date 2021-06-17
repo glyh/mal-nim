@@ -1,7 +1,8 @@
 import tables, strformat
-import definition
+import definition, printer
 
 proc set*(env: var MalEnvironment, symbol: string, value: MalType) =
+  #echo "set ", symbol, " to ", value
   env.symbols[symbol] = value
 
 proc get*(env: MalEnvironment, symbol: string) : MalEnvironment =

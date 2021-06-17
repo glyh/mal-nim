@@ -1,15 +1,13 @@
 (def! not (fn* (b)
   (if b false true)))
-(def! fib (fn* (n)
-  (if (< n 3)
-    1
-    (+ (fib (- n 1)) (fib (- n 2))))))
+
+(def! load-file (fn* (f)
+  (eval
+    (read-string
+      (str
+        "(do " (slurp f) "\nnil)")))))
 
 ; <=, >= to be implemented
-; (def! <= (fn* [& args]
-;   (if (= (count args) 1)
-;     true
-;
-;
-;
-;   )))
+
+(def! swap! (fn* [a, f]
+  (reset! a (f (deref a)))))

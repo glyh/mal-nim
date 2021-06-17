@@ -1,5 +1,5 @@
-import logging, tables, sugar, strformat
-import definition, env, printer
+import logging, tables, sugar, strformat, streams
+import definition, env, printer, reader
 
 var builtinFunctions* :
   Table[string, proc(args: varargs[MalType]) : MalType {.closure.} ]
@@ -293,6 +293,89 @@ builtinFunctions["println"] =
         s = rawString(i)
     echo s
     MalAtom(atomType: MalNil)
+
+builtinFunctions["read-string"] =
+  proc(args: varargs[MalType]) : MalType {.closure.} =
+    var a: MalAtom
+    try:
+      assert args.len == 1 and args[0] of MalAtom
+      a = MalAtom(args[0])
+      assert a.atomType == MalString
+    except:
+      raise newException(
+        FieldDefect,
+        "Wrong parameters passed to function `read-string`")
+    let parsed = readString(a.strValue)
+    #echo a.strValue, "|", parsed
+    return
+      if parsed.len < 1:
+        MalAtom(atomType: MalString, strValue: "")
+      else:
+        #echo parsed[^1]
+        parsed[^1]
+
+builtinFunctions["slurp"] =
+  proc(args: varargs[MalType]) : MalType {.closure.} =
+    var a: MalAtom
+    try:
+      assert args.len == 1 and args[0] of MalAtom
+      a = MalAtom(args[0])
+      assert a.atomType == MalString
+    except:
+      raise newException(
+        FieldDefect,
+        "Wrong parameters passed to function `slurp`")
+
+    var s = newFileStream(a.strValue, fmRead)
+    return MalAtom(atomType: MalString, strValue: s.readAll())
+
+builtinFunctions["atom"] =
+  proc(args: varargs[MalType]) : MalType {.closure.} =
+    try:
+      assert args.len == 1
+      return MalAtom(atomType: MalAtomValue, p: args[0])
+    except:
+      raise newException(
+        FieldDefect,
+        "Wrong parameters passed to function `atom`")
+
+builtinFunctions["atom?"] =
+  proc(args: varargs[MalType]) : MalType {.closure.} =
+    var a: MalAtom
+    try:
+      assert args.len == 1
+      return MalAtom(atomType: MalBool, boolValue: a.atomType == MalAtomValue)
+    except:
+      raise newException(
+        FieldDefect,
+        "Wrong parameters passed to function `atom?`")
+
+builtinFunctions["deref"] =
+  proc(args: varargs[MalType]) : MalType {.closure.} =
+    var a: MalAtom
+    try:
+      assert args.len == 1
+      a = MalAtom(args[0])
+      assert a.atomType == MalAtomValue
+      return a.p
+    except:
+      raise newException(
+        FieldDefect,
+        "Wrong parameters passed to function `deref`")
+
+builtinFunctions["reset!"] =
+  proc(args: varargs[MalType]) : MalType {.closure.} =
+    var a: MalAtom
+    try:
+      assert args.len == 2
+      a = MalAtom(args[0])
+      assert a.atomType == MalAtomValue
+      a.p = args[1]
+      return a.p
+    except:
+      raise newException(
+        FieldDefect,
+        "Wrong parameters passed to function `deref`")
 
 var defaultEnvironment* = MalEnvironment(
   symbols: initTable[string, MalType](),

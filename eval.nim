@@ -1,6 +1,7 @@
 import tables, strformat
 import definition, env, printer
 
+var outerMost*: MalEnvironment
 proc eval*(envInitial: var MalEnvironment, ast: MalType) : MalType
 proc evalAST(
   env: var MalEnvironment,
@@ -36,10 +37,11 @@ proc evalAST(
 proc eval*(
   envInitial: var MalEnvironment,
   ast: MalType) : MalType =
-  var env: ptr MalEnvironment = addr envInitial
   var
+    env: ptr MalEnvironment = addr envInitial
     ast = ast
   while true:
+    #echo "Evaluating: ", ast
     if ast of MalList:
       var l = MalList(ast)
       if l.items.len == 0:
@@ -91,6 +93,7 @@ proc eval*(
                 except AssertionDefect:
                   raise newException(MalSyntaxError, "Syntax error while parsing `let*`")
               of "do":
+                #echo "dodooddoo"
                 for i in args.low..<args.high:
                   discard eval(env[], args[i])
                 ast = args[^1]
@@ -166,28 +169,53 @@ proc eval*(
                     eval(envNew, astNew)
                   , VarArgs: allowVarargs)
                 return lambda
+              of "eval":
+                try: #Evaluate twice
+                  assert args.len == 1
+                  ast = eval(env[], args[0])
+                  env = addr outerMost
+                  continue
+                except:
+                  raise newException(MalSyntaxError, "Syntax error while parsing `eval`")
               else:
                 l = MalList(evalAST(env[], l))
                 let maybeF = l.items[0]
                 if maybeF of MalAtom:
                   let a = MalAtom(maybeF)
                   if a.atomType == MalLambda:
-                      ast = a.f.ast
-                      var args: seq[MalType]
-                      for i in l.items[1..^1]:
-                        args.add(eval(env[], i))
-                      var newEnv = MalEnvironment( #bug here
-                        outer: a.f.env,
-                        symbols: initTable[string, MalType]())
-                      env = addr newEnv
-                      env[].doBind(a.f.params, args, a.f.VarArgs)
-                      continue
+                    ast = a.f.ast
+                    var args: seq[MalType]
+                    for i in l.items[1..^1]:
+                      args.add(eval(env[], i))
+                    var newEnv = MalEnvironment( #bug here
+                      outer: a.f.env,
+                      symbols: initTable[string, MalType]())
+                    env = addr newEnv
+                    env[].doBind(a.f.params, args, a.f.VarArgs)
+                    continue
                   elif a.atomType == MalBuiltInLambda:
                     return
                       if l.items.len > 1:
                         a.fPrimitive(l.items[1..^1])
                       else:
                         a.fPrimitive()
+          elif a.atomType == MalLambda:
+            ast = a.f.ast
+            var args: seq[MalType]
+            for i in l.items[1..^1]:
+              args.add(eval(env[], i))
+            var newEnv = MalEnvironment( #bug here
+              outer: a.f.env,
+              symbols: initTable[string, MalType]())
+            env = addr newEnv
+            env[].doBind(a.f.params, args, a.f.VarArgs)
+            continue
+          elif a.atomType == MalBuiltInLambda:
+            return
+              if l.items.len > 1:
+                a.fPrimitive(l.items[1..^1])
+              else:
+                a.fPrimitive()
         raise newException(
           ValueError,
           fmt"Expecting symbol, but got ""{$(l.items[0])}""")

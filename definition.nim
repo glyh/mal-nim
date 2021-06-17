@@ -11,6 +11,7 @@ type
     MalLambda
     MalBuiltInLambda
     MalMacro
+    MalAtomValue
   MalType* = ref object of RootObj
   MalList* = ref object of MalType
     items*: seq[MalType]
@@ -47,6 +48,8 @@ type
         g*: (var MalEnvironment, varargs[MalType]) -> MalType
       of MalNil:
         discard
+      of MalAtomValue:
+        p*: MalType
   MalEnvironment* = ref object
     outer*: MalEnvironment
     symbols*: Table[string, MalType]
@@ -91,6 +94,8 @@ func hash*(x: MalType) : Hash =
         raise newException(FieldDefect, "Trying to hash lambdas!")
       of MalMacro:
         raise newException(FieldDefect, "Trying to hash macros!")
+      of MalAtomValue:
+        raise newException(FieldDefect, "Trying to hash atoms!")
   result = !$h
 
 #[
@@ -158,6 +163,8 @@ proc `==`*(lhs: MalType, rhs: MalType) : bool =
             raise newException(FieldDefect, "Trying to compare lambdas!")
           of MalMacro:
             raise newException(FieldDefect, "Trying to compare macros!")
+          of MalAtomValue:
+            raise newException(FieldDefect, "Trying to compare atoms!")
       )
   else:
     false

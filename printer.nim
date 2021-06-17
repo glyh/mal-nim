@@ -1,4 +1,4 @@
-import strutils, tables
+import strutils, tables, strformat
 import definition
 
 func rawString*(m: MalType) : string =
@@ -47,6 +47,8 @@ func rawString*(m: MalType) : string =
         result = "<Lambda>"
       of MalMacro:
         result = "<Macro>"
+      of MalAtomValue:
+        result = fmt"<Atom {rawString(a.p)}>"
   else:
     raise newException(FieldDefect, "Unknown syntax tree")
 
@@ -96,5 +98,7 @@ func `$`*(m : MalType) : string =
         result = "<Lambda>"
       of MalMacro:
         result = "<Macro>"
+      of MalAtomValue:
+        result = fmt"<Atom {$a.p}>"
   else:
     raise newException(FieldDefect, "Unknown syntax tree")
