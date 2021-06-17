@@ -26,11 +26,3 @@ proc doBind*(env: var MalEnvironment, binds: seq[string], exprs: seq[MalType], V
         env.set(binds[i], exprs[i])
   else:
     raise newException(MalSyntaxError, "Syntax error while parsing `fn*`")
-
-proc showChain*(env: MalEnvironment) =
-  if env.outer != nil:
-    showChain(env.outer)
-    echo "<-"
-  for i in env.symbols.keys:
-    stdout.write(i & " ")
-  echo""

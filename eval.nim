@@ -86,21 +86,13 @@ proc eval*(
                       assert a.atomType == MalSymbol
                       env[].set(a.id, eval(env[], val))
                       i += 2
-                  #[
-                    result = eval(env, args[1])
-                    env = env.outer
-                    return result
-                  ]#
-                  # TCO:
                   ast = args[1]
                   continue
                 except AssertionDefect:
                   raise newException(MalSyntaxError, "Syntax error while parsing `let*`")
               of "do":
-                # TCO
                 for i in args.low..<args.high:
                   discard eval(env[], args[i])
-                #return result
                 ast = args[^1]
                 continue
               of "if":
@@ -120,11 +112,9 @@ proc eval*(
                   else:
                     ast = args[2]
                     continue
-                    #eval(env, args[2])
                 else:
                   ast = args[1]
                   continue
-                  #eval(env, args[1])
               of "fn*":
                 let
                   env = env
@@ -167,7 +157,7 @@ proc eval*(
                 lambda.f = TCOData(
                   ast: astNew,
                   params: binds,
-                  env: env[], # should be dynamically set
+                  env: env[],
                   fn: proc (args: varargs[MalType]) : MalType =
                     var envNew = MalEnvironment(
                       outer: env[],
@@ -177,14 +167,7 @@ proc eval*(
                   , VarArgs: allowVarargs)
                 return lambda
               else:
-                #echo MalList(l).items
-                #for i in
-                #echo env.symbols, "!"
-                #if env.outer != nil:
-                  #echo env.outer.symbols, "!!"
-
                 l = MalList(evalAST(env[], l))
-                #echo l
                 let maybeF = l.items[0]
                 if maybeF of MalAtom:
                   let a = MalAtom(maybeF)
