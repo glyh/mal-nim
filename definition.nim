@@ -23,9 +23,9 @@ type
     ast*: MalType
     params*: seq[string]
     env*: MalEnvironment
-    #fn*: MalType
     fn*: (varargs[MalType]) -> MalType
     VarArgs*: bool
+    isMacro*: bool
   MalAtom* = ref object of MalType
     case atomType*: MalAtomType
       of MalInteger:

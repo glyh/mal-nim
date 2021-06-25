@@ -20,10 +20,15 @@ proc find*(env: MalEnvironment, symbol: string) : MalType =
 
 proc doBind*(env: var MalEnvironment, binds: seq[string], exprs: seq[MalType], Varargs: bool) =
   if binds.len == exprs.len or (Varargs and binds.len <= exprs.len + 1):
-    for i in 0..binds.high:
-      if i == binds.high and Varargs:
-        env.set(binds[i], MalList(items: exprs[i+1..^1]))
-      else:
-        env.set(binds[i], exprs[i])
+    #echo "bind |", binds, "|", exprs
+    if binds.len > 0:
+      for i in 0..binds.high:
+        if i == binds.high and Varargs:
+          if binds.len == exprs.len + 1:
+            env.set(binds[i], MalList(items: @[]))
+          else:
+            env.set(binds[i], MalList(items: exprs[i..^1]))
+        else:
+          env.set(binds[i], exprs[i])
   else:
     raise newException(MalSyntaxError, "Syntax error while parsing `fn*`")

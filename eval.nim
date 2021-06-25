@@ -2,6 +2,34 @@ import tables, strformat
 import definition, env, printer
 
 var outerMost*: MalEnvironment
+
+proc isMacroCall(ast: MalType, env: MalEnvironment): bool =
+  try:
+    return ast of MalList and (
+      let l = MalList(ast)
+      l.items.len >= 1 and (
+        let firstSym = l.items[0]
+        firstSym of MalAtom and (
+          let a = MalAtom(firstSym)
+          a.atomType == MalSymbol and (
+            let lookedUp = env.find(a.id)
+            lookedUp of MalAtom and (
+              let al = MalAtom(lookedUp)
+              al.atomType == MalLambda and al.f.isMacro)))))
+  except:
+    return false
+
+proc macroExpand(ast: MalType, env: MalEnvironment): MalType =
+  var ast = ast
+  while isMacroCall(ast, env):
+    let m : TCOData = MalAtom(env.find(MalAtom(MalList(ast).items[0]).id)).f
+    if MalList(ast).items.len > 1:
+      #echo MalList(ast).items
+      ast = m.fn(MalList(ast).items[1..^1])
+    else:
+      ast = m.fn()
+  ast
+
 proc eval*(envInitial: var MalEnvironment, ast: MalType) : MalType
 proc evalAST(
   env: var MalEnvironment,
@@ -34,6 +62,7 @@ proc evalAST(
       return env.find(asta.id)
     else: return ast
 
+var isDefMacro = false
 proc eval*(
   envInitial: var MalEnvironment,
   ast: MalType) : MalType =
@@ -102,11 +131,13 @@ proc eval*(
 
   var
     env: ptr MalEnvironment = addr envInitial
-    ast = ast
+    ast = macroExpand(ast, env[])
+  echo "expandededede! ", ast
 
   while true:
     if ast of MalList:
       var l = MalList(ast)
+      #echo MalList(l).items
       if l.items.len == 0:
         return l
       else:
@@ -133,6 +164,27 @@ proc eval*(
                 let val = eval(env[], args[1])
                 env[].set(a.id, val)
                 return val
+              of "defmacro!":
+                isDefMacro = true
+                var a: MalAtom
+                try:
+                  assert args.len == 2
+                  assert args[0] of MalAtom
+                  a = MalAtom(args[0])
+                  assert a.atomType == MalSymbol
+                except:
+                  isDefMacro = false
+                  raise newException(MalSyntaxError, "Syntax error while parsing `def!`")
+                let val = eval(env[], args[1])
+                env[].set(a.id, val)
+                isDefMacro = false
+                return val
+              of "macroexpand":
+                try:
+                  assert args.len == 1
+                  return macroExpand(args[0], env[])
+                except AssertionDefect:
+                  raise newException(MalSyntaxError, "Syntax error while parsing `let*`")
               of "let*":
                 try:
                   var envNew = MalEnvironment(outer: env[], symbols: initTable[string, MalType]())
@@ -167,6 +219,7 @@ proc eval*(
                 ast = args[^1]
                 continue
               of "if":
+                echo "if<- ", args
                 try:
                   assert args.len == 3 or args.len == 2
                 except:
@@ -233,9 +286,13 @@ proc eval*(
                     var envNew = MalEnvironment(
                       outer: env[],
                       symbols: initTable[string, MalType]())
+                    #echo "wowooowwowo!"
+                    #echo args
                     envNew.doBind(binds, @args, allowVarargs)
+                    #echo args
                     eval(envNew, astNew)
-                  , VarArgs: allowVarargs)
+                  , VarArgs: allowVarargs,
+                  isMacro: isDefMacro)
                 return lambda
               of "eval":
                 try: #Evaluate twice

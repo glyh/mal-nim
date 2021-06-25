@@ -422,6 +422,62 @@ builtinFunctions["vec"] =
         FieldDefect,
         "Wrong parameters passed to function `vec`")
 
+builtinFunctions["nth"] =
+  proc(args: varargs[MalType]) : MalType {.closure.} =
+    try:
+      assert args.len == 2
+      let index = MalAtom(args[1]).intValue
+      if args[0] of MalVector:
+        MalVector(args[0]).items[index]
+      else:
+        MalList(args[0]).items[index]
+    except:
+      raise newException(
+        FieldDefect,
+        "Wrong parameters passed to function `nth`")
+
+builtinFunctions["first"] =
+  proc(args: varargs[MalType]) : MalType {.closure.} =
+    try:
+      assert args.len == 1
+      if args[0] of MalVector:
+        let v = MalVector(args[0])
+        if v.items.len == 0: MalAtom(atomType: MalNil) else: v.items[0]
+      elif args[0] of MalList:
+        let l = MalList(args[0])
+        if l.items.len == 0: MalAtom(atomType: MalNil) else: l.items[0]
+      else:
+        assert (args[0] of MalAtom and MalAtom(args[0]).atomType == MalNil)
+        MalAtom(atomType: MalNil)
+    except:
+      raise newException(
+        FieldDefect,
+        "Wrong parameters passed to function `nth`")
+
+builtinFunctions["rest"] =
+  proc(args: varargs[MalType]) : MalType {.closure.} =
+    try:
+      assert args.len == 1
+      if args[0] of MalVector:
+        let v = MalVector(args[0])
+        if v.items.len == 0:
+          MalList(items: @[])
+        else:
+          MalList(items: v.items[1..^1])
+      elif args[0] of MalList:
+        let l = MalList(args[0])
+        if l.items.len == 0:
+          MalList(items: @[])
+        else:
+          MalList(items: l.items[1..^1])
+      else:
+        assert (args[0] of MalAtom and MalAtom(args[0]).atomType == MalNil)
+        MalList(items: @[])
+    except:
+      raise newException(
+        FieldDefect,
+        "Wrong parameters passed to function `rest`")
+
 var defaultEnvironment* = MalEnvironment(
   symbols: initTable[string, MalType](),
   outer: nil)
