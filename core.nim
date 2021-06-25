@@ -377,6 +377,51 @@ builtinFunctions["reset!"] =
         FieldDefect,
         "Wrong parameters passed to function `deref`")
 
+builtinFunctions["cons"] =
+  proc(args: varargs[MalType]) : MalType {.closure.} =
+    try:
+      assert args.len == 2
+      let its =
+        if args[1] of MalList:
+          MalList(args[1]).items
+        else:
+          MalVector(args[1]).items
+      return MalList(items: args[0] & its)
+    except:
+      raise newException(
+        FieldDefect,
+        "Wrong parameters passed to function `cons`")
+
+builtinFunctions["concat"] =
+  proc(args: varargs[MalType]) : MalType {.closure.} =
+    try:
+      var rseq = newSeq[MalType]()
+      for i in args:
+        let its =
+          if i of MalList:
+            MalList(i).items
+          else:
+            MalVector(i).items
+        rseq &= its
+      return MalList(items: rseq)
+    except:
+      raise newException(
+        FieldDefect,
+        "Wrong parameters passed to function `concat`")
+
+builtinFunctions["vec"] =
+  proc(args: varargs[MalType]) : MalType {.closure.} =
+    try:
+      assert args.len == 1
+      if args[0] of MalVector:
+        args[0]
+      else:
+        MalVector(items: MalList(args[0]).items)
+    except:
+      raise newException(
+        FieldDefect,
+        "Wrong parameters passed to function `vec`")
+
 var defaultEnvironment* = MalEnvironment(
   symbols: initTable[string, MalType](),
   outer: nil)

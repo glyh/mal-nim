@@ -37,19 +37,88 @@ proc evalAST(
 proc eval*(
   envInitial: var MalEnvironment,
   ast: MalType) : MalType =
+
+  proc quasiquote(args : varargs[MalType]) : MalType =
+    try:
+      assert args.len == 1
+      let arg = args[0]
+      if arg of MalList:
+        let l = MalList(arg)
+        if l.items.len == 2 and
+           l.items[0] of MalAtom and
+           MalAtom(l.items[0]).atomType == MalSymbol and
+           MalAtom(l.items[0]).id == "unquote":
+          #if l.items[1] of MalAtom and
+          #  MalAtom(l.items[1]).atomType == MalSymbol:
+            return l.items[1]
+          #else:
+          #  return MalList(items:
+          #    @[MalAtom(atomType: MalSymbol, id: "quote"), l])
+        else:
+          result = MalList(items: @[])
+          if l.items.len == 0:
+            return result
+          for id in countdown(l.items.high, l.items.low):
+            let elt = l.items[id]
+            if elt of MalList:
+              let eltl = MalList(elt)
+              if eltl.items.len == 2 and
+                 eltl.items[0] of MalAtom and
+                 MalAtom(eltl.items[0]).atomType == MalSymbol and
+                 MalAtom(eltl.items[0]).id == "splice-unquote":
+                result = MalList(items:
+                  @[MalAtom(atomType: MalSymbol, id: "concat"),
+                    eltl.items[1],
+                    result])
+              else:
+                result = MalList(items:
+                  @[MalAtom(atomType: MalSymbol, id: "cons"),
+                    quasiquote(elt),
+                    result])
+            else:
+              result = MalList(items:
+                @[MalAtom(atomType: MalSymbol, id: "cons"),
+                  quasiquote(elt),
+                  result])
+          return result
+      elif arg of MalAtom:
+        if MalAtom(arg).atomType == MalSymbol:
+          return MalList(items:
+            @[MalAtom(atomType: MalSymbol, id: "quote"),
+              arg])
+      elif arg of MalHashMap:
+        return MalList(items:
+          @[MalAtom(atomType: MalSymbol, id: "quote"),
+            arg])
+      elif arg of MalVector:
+        return MalList(items:
+          @[MalAtom(atomType: MalSymbol, id: "vec") ,
+          quasiquote(MalList(items: MalVector(arg).items))])
+      arg
+    except:
+      raise newException(
+        FieldDefect,
+        "Wrong parameters passed to function `quasiquote`")
+
   var
     env: ptr MalEnvironment = addr envInitial
     ast = ast
+
   while true:
-    #echo "Evaluating: ", ast
     if ast of MalList:
       var l = MalList(ast)
       if l.items.len == 0:
         return l
       else:
-        let args = l.items[1..^1]
-        if l.items[0] of MalAtom:
-          let a = MalAtom(l.items[0])
+        let
+          args = l.items[1..^1]
+          head =
+            if l.items[0] of MalAtom:
+              l.items[0]
+            else:
+              eval(env[], l.items[0])
+        if head of MalAtom:
+          let a = MalAtom(head)
           if a.atomType == MalSymbol:
             case a.id:
               of "def!":
@@ -93,7 +162,6 @@ proc eval*(
                 except AssertionDefect:
                   raise newException(MalSyntaxError, "Syntax error while parsing `let*`")
               of "do":
-                #echo "dodooddoo"
                 for i in args.low..<args.high:
                   discard eval(env[], args[i])
                 ast = args[^1]
@@ -177,6 +245,23 @@ proc eval*(
                   continue
                 except:
                   raise newException(MalSyntaxError, "Syntax error while parsing `eval`")
+              of "quote":
+                if args.len != 1:
+                  raise newException(MalSyntaxError, "Syntax error while parsing `quote`")
+                return args[0]
+              of "quasiquoteexpand":
+                try:
+                  assert args.len == 1
+                  return quasiquote(args[0])
+                except:
+                  raise newException(MalSyntaxError, "Syntax error while parsing `quasiquote`")
+              of "quasiquote":
+                try:
+                  assert args.len == 1
+                  ast = quasiquote(args[0])
+                  continue
+                except:
+                  raise newException(MalSyntaxError, "Syntax error while parsing `quasiquote`")
               else:
                 l = MalList(evalAST(env[], l))
                 let maybeF = l.items[0]

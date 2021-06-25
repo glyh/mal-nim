@@ -116,11 +116,12 @@ proc readForm(r: var Reader) : MalType =
     of ")", "]", "}":
       raise newException(MalReadRBracket, r.peak())
     of "'", "`", "~", "~@", "@":
-      const specialMap = {"'": "quote",
-                   "`": "quasiquote",
-                   "~": "unquote",
-                   "~@": "splice-unquote",
-                   "@": "deref"}.toTable()
+      const specialMap = {
+        "'": "quote",
+        "`": "quasiquote",
+        "~": "unquote",
+        "~@": "splice-unquote",
+        "@": "deref"}.toTable()
       let special = r.peak()
       r.forward()
       MalList(items:
